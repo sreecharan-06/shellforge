@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -Iinclude
 
-SRC = src/main.c src/token.c src/lexer.c
+SRC = src/main.c src/token.c src/lexer.c src/parser.c src/expand.c
 TARGET = shellforge
 
 all: $(TARGET)
