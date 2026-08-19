@@ -2,66 +2,63 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../include/lexer.h"
+#include "lexer.h"
 
-#define MAX_TOKENS 100
-
-static void add_token(Token **tokens, int *count,
-                      TokenType type, const char *value)
+static void add_token(token_list_t *tokens, TokenType type, const char *value)
 {
-    if (*count >= MAX_TOKENS - 1)
+    if (tokens->count >= MAX_TOKENS - 1)
         return;
 
-    tokens[*count] = create_token(type, value);
-    (*count)++;
+    tokens->tokens[tokens->count] = create_token(type, value);
+    tokens->count++;
 }
 
-Token **lex_line(const char *input, int *token_count)
+void lexer(const char *line, token_list_t *tokens)
 {
-    Token **tokens = malloc(sizeof(Token *) * MAX_TOKENS);
+    tokens->count = 0;
+    for (int i = 0; i < MAX_TOKENS; i++)
+    {
+        tokens->tokens[i] = NULL;
+    }
 
-    if (tokens == NULL)
-        return NULL;
-
-    int count = 0;
     int i = 0;
 
-    while (input[i] != '\0')
+    while (line[i] != '\0')
     {
         /* Skip spaces */
-        if (isspace((unsigned char)input[i]))
+        if (isspace((unsigned char)line[i]))
         {
             i++;
             continue;
         }
 
         /* Pipe */
-        if (input[i] == '|')
+        if (line[i] == '|')
         {
-            add_token(tokens, &count, TOKEN_PIPE, "|");
+            add_token(tokens, TOKEN_PIPE, "|");
             i++;
             continue;
         }
 
         /* Input redirection */
-        if (input[i] == '<')
+        if (line[i] == '<')
         {
-            add_token(tokens, &count, TOKEN_INPUT, "<");
+            add_token(tokens, TOKEN_INPUT, "<");
             i++;
             continue;
         }
 
         /* Output redirection */
-        if (input[i] == '>')
+        if (line[i] == '>')
         {
-            if (input[i + 1] == '>')
+            if (line[i + 1] == '>')
             {
-                add_token(tokens, &count, TOKEN_APPEND, ">>");
+                add_token(tokens, TOKEN_APPEND, ">>");
                 i += 2;
             }
             else
             {
-                add_token(tokens, &count, TOKEN_OUTPUT, ">");
+                add_token(tokens, TOKEN_OUTPUT, ">");
                 i++;
             }
 
@@ -69,17 +66,17 @@ Token **lex_line(const char *input, int *token_count)
         }
 
         /* Error output redirection */
-        if (input[i] == '2' && input[i + 1] == '>')
+        if (line[i] == '2' && line[i + 1] == '>')
         {
-            add_token(tokens, &count, TOKEN_ERROR_OUTPUT, "2>");
+            add_token(tokens, TOKEN_ERROR_OUTPUT, "2>");
             i += 2;
             continue;
         }
 
         /* Background */
-        if (input[i] == '&')
+        if (line[i] == '&')
         {
-            add_token(tokens, &count, TOKEN_BACKGROUND, "&");
+            add_token(tokens, TOKEN_BACKGROUND, "&");
             i++;
             continue;
         }
@@ -88,15 +85,15 @@ Token **lex_line(const char *input, int *token_count)
         char buffer[1024];
         int j = 0;
 
-        while (input[i] != '\0' &&
-               !isspace((unsigned char)input[i]) &&
-               input[i] != '|' &&
-               input[i] != '<' &&
-               input[i] != '>' &&
-               input[i] != '&')
+        while (line[i] != '\0' &&
+               !isspace((unsigned char)line[i]) &&
+               line[i] != '|' &&
+               line[i] != '<' &&
+               line[i] != '>' &&
+               line[i] != '&')
         {
             if (j < (int)sizeof(buffer) - 1)
-                buffer[j++] = input[i];
+                buffer[j++] = line[i];
 
             i++;
         }
@@ -104,26 +101,23 @@ Token **lex_line(const char *input, int *token_count)
         buffer[j] = '\0';
 
         if (j > 0)
-            add_token(tokens, &count, TOKEN_WORD, buffer);
+            add_token(tokens, TOKEN_WORD, buffer);
     }
 
     /* End of input */
-    tokens[count] = create_token(TOKEN_EOF, NULL);
-    count++;
-
-    *token_count = count;
-
-    return tokens;
+    tokens->tokens[tokens->count] = create_token(TOKEN_EOF, NULL);
+    tokens->count++;
 }
 
-void free_tokens(Token **tokens, int token_count)
+void free_tokens(token_list_t *tokens)
 {
     if (tokens == NULL)
         return;
 
-    for (int i = 0; i < token_count; i++)
-        free_token(tokens[i]);
-
-    free(tokens);
+    for (int i = 0; i < tokens->count; i++)
+    {
+        free_token(tokens->tokens[i]);
+        tokens->tokens[i] = NULL;
+    }
+    tokens->count = 0;
 }
-

@@ -5,8 +5,9 @@
 
 #include "parser.h"
 
-void command_init(Command *cmd)
+void command_init(command_t *cmd)
 {
+    cmd->argc = 0;
     cmd->input = NULL;
     cmd->output = NULL;
     cmd->append = 0;
@@ -16,7 +17,7 @@ void command_init(Command *cmd)
         cmd->argv[i] = NULL;
 }
 
-static void pipeline_init(Pipeline *pipeline)
+static void pipeline_init(pipeline_t *pipeline)
 {
     pipeline->command_count = 0;
 
@@ -24,44 +25,44 @@ static void pipeline_init(Pipeline *pipeline)
         command_init(&pipeline->commands[i]);
 }
 
-static int add_argument(Command *cmd, const char *value)
+static int add_argument(command_t *cmd, const char *value)
 {
-    int i = 0;
-
-    while (i < MAX_ARGS - 1 && cmd->argv[i] != NULL)
-        i++;
-
-    if (i >= MAX_ARGS - 1)
+    if (cmd->argc >= MAX_ARGS - 1)
     {
         fprintf(stderr, "Error: too many arguments\n");
         return 0;
     }
 
-    cmd->argv[i] = strdup(value);
+    cmd->argv[cmd->argc] = strdup(value);
 
-    if (cmd->argv[i] == NULL)
+    if (cmd->argv[cmd->argc] == NULL)
     {
         perror("strdup");
         return 0;
     }
 
+    cmd->argc++;
+    cmd->argv[cmd->argc] = NULL;
+
     return 1;
 }
 
-int parse(Token **tokens, Pipeline *pipeline)
+int parser(token_list_t *tokens, pipeline_t *pipeline)
 {
     pipeline_init(pipeline);
 
-    if (tokens == NULL || tokens[0] == NULL)
+    if (tokens == NULL || tokens->count == 0)
         return 0;
 
     pipeline->command_count = 1;
 
-    Command *current = &pipeline->commands[0];
+    command_t *current = &pipeline->commands[0];
 
-    for (int i = 0; tokens[i] != NULL; i++)
+    for (int i = 0; i < tokens->count; i++)
     {
-        Token *token = tokens[i];
+        Token *token = tokens->tokens[i];
+        if (token == NULL)
+            continue;
 
         switch (token->type)
         {
@@ -74,15 +75,16 @@ int parse(Token **tokens, Pipeline *pipeline)
 
             case TOKEN_INPUT:
 
-                if (tokens[i + 1] == NULL ||
-                    tokens[i + 1]->type != TOKEN_WORD)
+                if (i + 1 >= tokens->count ||
+                    tokens->tokens[i + 1] == NULL ||
+                    tokens->tokens[i + 1]->type != TOKEN_WORD)
                 {
                     fprintf(stderr,
                             "Error: filename expected after <\n");
                     return 0;
                 }
 
-                current->input = strdup(tokens[++i]->value);
+                current->input = strdup(tokens->tokens[++i]->value);
 
                 if (current->input == NULL)
                     return 0;
@@ -91,15 +93,16 @@ int parse(Token **tokens, Pipeline *pipeline)
 
             case TOKEN_OUTPUT:
 
-                if (tokens[i + 1] == NULL ||
-                    tokens[i + 1]->type != TOKEN_WORD)
+                if (i + 1 >= tokens->count ||
+                    tokens->tokens[i + 1] == NULL ||
+                    tokens->tokens[i + 1]->type != TOKEN_WORD)
                 {
                     fprintf(stderr,
                             "Error: filename expected after >\n");
                     return 0;
                 }
 
-                current->output = strdup(tokens[++i]->value);
+                current->output = strdup(tokens->tokens[++i]->value);
                 current->append = 0;
 
                 if (current->output == NULL)
@@ -109,15 +112,16 @@ int parse(Token **tokens, Pipeline *pipeline)
 
             case TOKEN_APPEND:
 
-                if (tokens[i + 1] == NULL ||
-                    tokens[i + 1]->type != TOKEN_WORD)
+                if (i + 1 >= tokens->count ||
+                    tokens->tokens[i + 1] == NULL ||
+                    tokens->tokens[i + 1]->type != TOKEN_WORD)
                 {
                     fprintf(stderr,
                             "Error: filename expected after >>\n");
                     return 0;
                 }
 
-                current->output = strdup(tokens[++i]->value);
+                current->output = strdup(tokens->tokens[++i]->value);
                 current->append = 1;
 
                 if (current->output == NULL)
@@ -127,20 +131,16 @@ int parse(Token **tokens, Pipeline *pipeline)
 
             case TOKEN_ERROR_OUTPUT:
 
-                if (tokens[i + 1] == NULL ||
-                    tokens[i + 1]->type != TOKEN_WORD)
+                if (i + 1 >= tokens->count ||
+                    tokens->tokens[i + 1] == NULL ||
+                    tokens->tokens[i + 1]->type != TOKEN_WORD)
                 {
                     fprintf(stderr,
                             "Error: filename expected after 2>\n");
                     return 0;
                 }
 
-                /*
-                 * This milestone's Command structure does not
-                 * currently contain a separate error-output field.
-                 * Treat it as output for parsing/display purposes.
-                 */
-                current->output = strdup(tokens[++i]->value);
+                current->output = strdup(tokens->tokens[++i]->value);
                 current->append = 0;
 
                 if (current->output == NULL)
@@ -150,7 +150,7 @@ int parse(Token **tokens, Pipeline *pipeline)
 
             case TOKEN_PIPE:
 
-                if (current->argv[0] == NULL)
+                if (current->argc == 0)
                 {
                     fprintf(stderr,
                             "Error: empty command before pipe\n");
@@ -191,7 +191,7 @@ int parse(Token **tokens, Pipeline *pipeline)
 
 finished:
 
-    if (current->argv[0] == NULL)
+    if (current->argc == 0)
     {
         fprintf(stderr, "Error: empty command\n");
         return 0;
@@ -200,14 +200,14 @@ finished:
     return 1;
 }
 
-void pipeline_print(Pipeline *pipeline)
+void pipeline_print(pipeline_t *pipeline)
 {
     printf("\n");
     printf("========== PIPELINE ==========\n");
 
     for (int i = 0; i < pipeline->command_count; i++)
     {
-        Command *cmd = &pipeline->commands[i];
+        command_t *cmd = &pipeline->commands[i];
 
         printf("\nCommand %d\n", i + 1);
         printf("--------------------------------\n");
@@ -215,7 +215,7 @@ void pipeline_print(Pipeline *pipeline)
         printf("Arguments\n");
 
         for (int j = 0;
-             j < MAX_ARGS && cmd->argv[j] != NULL;
+             j < cmd->argc;
              j++)
         {
             printf("argv[%d] = %s\n", j, cmd->argv[j]);
@@ -237,13 +237,13 @@ void pipeline_print(Pipeline *pipeline)
     printf("================================\n");
 }
 
-void pipeline_free(Pipeline *pipeline)
+void pipeline_free(pipeline_t *pipeline)
 {
     for (int i = 0; i < pipeline->command_count; i++)
     {
-        Command *cmd = &pipeline->commands[i];
+        command_t *cmd = &pipeline->commands[i];
 
-        for (int j = 0; j < MAX_ARGS; j++)
+        for (int j = 0; j < cmd->argc; j++)
         {
             free(cmd->argv[j]);
             cmd->argv[j] = NULL;
@@ -254,6 +254,7 @@ void pipeline_free(Pipeline *pipeline)
 
         cmd->input = NULL;
         cmd->output = NULL;
+        cmd->argc = 0;
     }
 
     pipeline->command_count = 0;

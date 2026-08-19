@@ -3,6 +3,6 @@
 
 #include "parser.h"
 
-void expand_variables(Pipeline *pipeline);
+void expand_variables(pipeline_t *pipeline);
 
 #endif

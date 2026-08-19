@@ -165,7 +165,7 @@ static char *expand_string(const char *str)
     return result;
 }
 
-void expand_variables(Pipeline *pipeline)
+void expand_variables(pipeline_t *pipeline)
 {
     if (pipeline == NULL)
         return;
@@ -174,11 +174,11 @@ void expand_variables(Pipeline *pipeline)
          i < pipeline->command_count;
          i++)
     {
-        Command *cmd = &pipeline->commands[i];
+        command_t *cmd = &pipeline->commands[i];
 
         /* Expand command arguments */
         for (int j = 0;
-             j < MAX_ARGS && cmd->argv[j] != NULL;
+             j < cmd->argc;
              j++)
         {
             char *expanded =
