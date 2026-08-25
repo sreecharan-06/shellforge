@@ -93,24 +93,8 @@ def main():
     
     # 1. GENERATE MILESTONE 2.2 SCREENSHOT (with parser & expand prints)
     # Read original main.c
-    with open(main_c_path, 'r') as f:
-        orig_main = f.read()
-        
-    # Modify main.c to uncomment token_print and pipeline_print
-    m22_main = orig_main.replace('// token_print(&tokens);', 'token_print(&tokens);')
-    # Or in our main.c we didn't have comments, let's insert them!
-    # Let's insert them right after lexer and parser
-    m22_main = orig_main.replace(
-        'lexer(line, &tokens);',
-        'lexer(line, &tokens);\n        token_print(&tokens);'
-    ).replace(
-        'expand_variables(&pipeline);',
-        'expand_variables(&pipeline);\n            pipeline_print(&pipeline);'
-    )
-    
-    with open(main_c_path, 'w') as f:
-        f.write(m22_main)
-        
+    # Since token_print and pipeline_print are enabled by default in main.c,
+    # we compile and run directly.
     compile_shellforge()
     
     m22_input = """echo "Welcome to Milestone 2"
@@ -119,12 +103,6 @@ exit
 """
     m22_out = run_shellforge(m22_input)
     draw_terminal(m22_out, 'screenshot_m22.png')
-    
-    # Restore original main.c
-    with open(main_c_path, 'w') as f:
-        f.write(orig_main)
-        
-    compile_shellforge()
     
     # 2. GENERATE MILESTONE 3.1 SCREENSHOT (builtins)
     m31_input = """pwd

@@ -51,12 +51,12 @@ int main(void)
         add_history(line);
 
         lexer(line, &tokens);
-        // token_print(&tokens);
+        token_print(&tokens);
 
         if (parser(&tokens, &pipeline))
         {
             expand_variables(&pipeline);
-            // pipeline_print(&pipeline);
+            pipeline_print(&pipeline);
             
             for (int i = 0; i < pipeline.command_count; i++)
             {
