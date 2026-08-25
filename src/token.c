@@ -1,47 +1,72 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include "token.h"
 
-#include "../include/token.h"
-
-Token *create_token(TokenType type, const char *value)
+void token_list_init(token_list_t *list)
 {
-    Token *token = malloc(sizeof(Token));
-
-    if (token == NULL)
+    if (list != NULL)
     {
-        perror("malloc");
-        exit(EXIT_FAILURE);
+        list->count = 0;
+    }
+}
+
+void token_add(token_list_t *list, token_type_t type, const char *text)
+{
+    if (list == NULL || list->count >= MAX_TOKENS)
+    {
+        return;
     }
 
-    token->type = type;
-
-    if (value != NULL)
+    token_t *t = &list->tokens[list->count];
+    t->type = type;
+    
+    if (text != NULL)
     {
-        token->value = malloc(strlen(value) + 1);
-
-        if (token->value == NULL)
-        {
-            perror("malloc");
-            free(token);
-            exit(EXIT_FAILURE);
-        }
-
-        strcpy(token->value, value);
+        strncpy(t->text, text, MAX_TOKEN_LEN - 1);
+        t->text[MAX_TOKEN_LEN - 1] = '\0';
     }
     else
     {
-        token->value = NULL;
+        t->text[0] = '\0';
     }
-
-    return token;
+    
+    list->count++;
 }
 
-void free_token(Token *token)
+const char *token_name(token_type_t type)
 {
-    if (token == NULL)
-        return;
+    switch (type)
+    {
+        case TOKEN_WORD:
+            return "WORD";
+        case TOKEN_PIPE:
+            return "PIPE";
+        case TOKEN_INPUT:
+            return "INPUT";
+        case TOKEN_OUTPUT:
+            return "OUTPUT";
+        case TOKEN_APPEND:
+            return "APPEND";
+        case TOKEN_BACKGROUND:
+            return "BACKGROUND";
+        case TOKEN_END:
+            return "END";
+        default:
+            return "UNKNOWN";
+    }
+}
 
-    free(token->value);
-    free(token);
+void token_print(const token_list_t *list)
+{
+    if (list == NULL)
+    {
+        return;
+    }
+
+    printf("---------------- TOKENS ----------------\n");
+    for (int i = 0; i < list->count; i++)
+    {
+        printf("%d : %-15s %s\n", i, token_name(list->tokens[i].type), list->tokens[i].text);
+    }
+    printf("----------------------------------------\n");
 }

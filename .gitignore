@@ -1,0 +1,12 @@
+# Compiled binaries
+shellforge
+
+# Object files
+*.o
+src/*.o
+
+# Temporary files
+actual_output.txt
+temp_in.txt
+temp_out.txt
+testdir/

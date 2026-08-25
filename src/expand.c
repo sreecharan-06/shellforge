@@ -2,219 +2,134 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-
 #include "expand.h"
 
-static char *expand_string(const char *str)
+static void expand_string(const char *src, char *dest, int dest_len)
 {
-    size_t capacity = 128;
-    size_t length = 0;
+    int src_idx = 0;
+    int dest_idx = 0;
 
-    char *result = malloc(capacity);
-
-    if (result == NULL)
-        return NULL;
-
-    result[0] = '\0';
-
-    for (size_t i = 0; str[i] != '\0'; i++)
+    while (src[src_idx] != '\0' && dest_idx < dest_len - 1)
     {
-        /* Variable expansion */
-        if (str[i] == '$')
+        if (src[src_idx] == '$')
         {
-            i++;
+            src_idx++; // skip '$'
 
-            if (str[i] == '\0')
+            // Check for ${VAR} syntax
+            if (src[src_idx] == '{')
             {
-                if (length + 2 >= capacity)
-                {
-                    capacity *= 2;
-                    char *temp = realloc(result, capacity);
+                src_idx++; // skip '{'
+                char var_name[256];
+                size_t var_idx = 0;
 
-                    if (temp == NULL)
+                while (src[src_idx] != '\0' && src[src_idx] != '}')
+                {
+                    if (var_idx < sizeof(var_name) - 1)
                     {
-                        free(result);
-                        return NULL;
+                        var_name[var_idx++] = src[src_idx];
                     }
-                    result = temp;
+                    src_idx++;
+                }
+                var_name[var_idx] = '\0';
+
+                if (src[src_idx] == '}')
+                {
+                    src_idx++; // skip '}'
                 }
 
-                result[length++] = '$';
-                result[length] = '\0';
-                break;
+                // Lookup environment variable
+                const char *val = getenv(var_name);
+                if (val != NULL)
+                {
+                    while (*val != '\0' && dest_idx < dest_len - 1)
+                    {
+                        dest[dest_idx++] = *val++;
+                    }
+                }
             }
-
-            char variable[128];
-            int j = 0;
-            int is_braced = 0;
-
-            /* ${VARIABLE} */
-            if (str[i] == '{')
+            else
             {
-                is_braced = 1;
-                i++;
+                // Alphanumeric/underscore name: $VAR
+                char var_name[256];
+                size_t var_idx = 0;
 
-                while (str[i] != '\0' &&
-                       str[i] != '}' &&
-                       j < 127)
+                // Read variable name
+                while (src[src_idx] != '\0' && (isalnum((unsigned char)src[src_idx]) || src[src_idx] == '_'))
                 {
-                    variable[j++] = str[i++];
+                    if (var_idx < sizeof(var_name) - 1)
+                    {
+                        var_name[var_idx++] = src[src_idx];
+                    }
+                    src_idx++;
                 }
+                var_name[var_idx] = '\0';
 
-                variable[j] = '\0';
-
-                if (str[i] == '}')
+                if (var_idx == 0)
                 {
-                    /* Move past } */
+                    // If no variable name followed the '$', treat it as a literal '$'
+                    dest[dest_idx++] = '$';
                 }
                 else
                 {
-                    i--;
-                }
-            }
-            else
-            {
-                /* $VARIABLE */
-                while (str[i] != '\0' &&
-                       (isalnum((unsigned char)str[i]) ||
-                        str[i] == '_') &&
-                       j < 127)
-                {
-                    variable[j++] = str[i++];
-                }
-
-                variable[j] = '\0';
-
-                i--;
-            }
-
-            if (j > 0)
-            {
-                const char *value = getenv(variable);
-
-                if (value != NULL)
-                {
-                    size_t value_len = strlen(value);
-
-                    while (length + value_len + 1 >= capacity)
+                    const char *val = getenv(var_name);
+                    if (val != NULL)
                     {
-                        capacity *= 2;
-
-                        char *temp = realloc(result, capacity);
-
-                        if (temp == NULL)
+                        while (*val != '\0' && dest_idx < dest_len - 1)
                         {
-                            free(result);
-                            return NULL;
+                            dest[dest_idx++] = *val++;
                         }
-
-                        result = temp;
                     }
-
-                    strcpy(result + length, value);
-                    length += value_len;
-                }
-            }
-            else
-            {
-                // No valid variable name followed '$'
-                // If it was '${}', we can choose to ignore or keep it.
-                // If it was just '$' followed by space/etc (like '$ '), we keep the '$'
-                if (!is_braced)
-                {
-                    if (length + 2 >= capacity)
-                    {
-                        capacity *= 2;
-                        char *temp = realloc(result, capacity);
-
-                        if (temp == NULL)
-                        {
-                            free(result);
-                            return NULL;
-                        }
-                        result = temp;
-                    }
-                    result[length++] = '$';
-                    result[length] = '\0';
                 }
             }
         }
         else
         {
-            /* Normal character */
-            if (length + 2 >= capacity)
-            {
-                capacity *= 2;
-
-                char *temp = realloc(result, capacity);
-
-                if (temp == NULL)
-                {
-                    free(result);
-                    return NULL;
-                }
-
-                result = temp;
-            }
-
-            result[length++] = str[i];
-            result[length] = '\0';
+            dest[dest_idx++] = src[src_idx++];
         }
     }
-
-    return result;
+    dest[dest_idx] = '\0';
 }
 
 void expand_variables(pipeline_t *pipeline)
 {
     if (pipeline == NULL)
+    {
         return;
+    }
 
-    for (int i = 0;
-         i < pipeline->command_count;
-         i++)
+    for (int i = 0; i < pipeline->command_count; i++)
     {
         command_t *cmd = &pipeline->commands[i];
-
-        /* Expand command arguments */
-        for (int j = 0;
-             j < cmd->argc;
-             j++)
+        
+        // 1. Expand command arguments
+        for (int j = 0; j < cmd->argc; j++)
         {
-            char *expanded =
-                expand_string(cmd->argv[j]);
-
-            if (expanded != NULL)
-            {
-                free(cmd->argv[j]);
-                cmd->argv[j] = expanded;
-            }
+            char expanded[4096];
+            expand_string(cmd->argv[j], expanded, sizeof(expanded));
+            
+            // Write expanded string back in place to the token text buffer.
+            // Since cmd->argv[j] points to the token's text field (size 256),
+            // copy at most 255 bytes.
+            strncpy(cmd->argv[j], expanded, 255);
+            cmd->argv[j][255] = '\0';
         }
 
-        /* Expand input filename */
-        if (cmd->input != NULL)
+        // 2. Expand input redirection file path
+        if (strlen(cmd->input) > 0)
         {
-            char *expanded =
-                expand_string(cmd->input);
-
-            if (expanded != NULL)
-            {
-                free(cmd->input);
-                cmd->input = expanded;
-            }
+            char expanded[256];
+            expand_string(cmd->input, expanded, sizeof(expanded));
+            strncpy(cmd->input, expanded, sizeof(cmd->input) - 1);
+            cmd->input[sizeof(cmd->input) - 1] = '\0';
         }
 
-        /* Expand output filename */
-        if (cmd->output != NULL)
+        // 3. Expand output redirection file path
+        if (strlen(cmd->output) > 0)
         {
-            char *expanded =
-                expand_string(cmd->output);
-
-            if (expanded != NULL)
-            {
-                free(cmd->output);
-                cmd->output = expanded;
-            }
+            char expanded[256];
+            expand_string(cmd->output, expanded, sizeof(expanded));
+            strncpy(cmd->output, expanded, sizeof(cmd->output) - 1);
+            cmd->output[sizeof(cmd->output) - 1] = '\0';
         }
     }
 }

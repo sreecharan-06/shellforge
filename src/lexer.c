@@ -1,123 +1,179 @@
-#include <ctype.h>
-#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-
+#include <ctype.h>
 #include "lexer.h"
 
-static void add_token(token_list_t *tokens, TokenType type, const char *value)
+void lexer(const char *input, token_list_t *list)
 {
-    if (tokens->count >= MAX_TOKENS - 1)
-        return;
-
-    tokens->tokens[tokens->count] = create_token(type, value);
-    tokens->count++;
-}
-
-void lexer(const char *line, token_list_t *tokens)
-{
-    tokens->count = 0;
-    for (int i = 0; i < MAX_TOKENS; i++)
+    if (input == NULL || list == NULL)
     {
-        tokens->tokens[i] = NULL;
+        return;
     }
 
+    token_list_init(list);
     int i = 0;
 
-    while (line[i] != '\0')
+    while (input[i] != '\0')
     {
-        /* Skip spaces */
-        if (isspace((unsigned char)line[i]))
+        // Skip whitespace
+        if (isspace((unsigned char)input[i]))
         {
             i++;
             continue;
         }
 
-        /* Pipe */
-        if (line[i] == '|')
+        // Delimiter: PIPE
+        if (input[i] == '|')
         {
-            add_token(tokens, TOKEN_PIPE, "|");
+            token_add(list, TOKEN_PIPE, "|");
             i++;
             continue;
         }
 
-        /* Input redirection */
-        if (line[i] == '<')
+        // Delimiter: INPUT redirection
+        if (input[i] == '<')
         {
-            add_token(tokens, TOKEN_INPUT, "<");
+            token_add(list, TOKEN_INPUT, "<");
             i++;
             continue;
         }
 
-        /* Output redirection */
-        if (line[i] == '>')
+        // Delimiter: OUTPUT or APPEND redirection
+        if (input[i] == '>')
         {
-            if (line[i + 1] == '>')
+            if (input[i + 1] == '>')
             {
-                add_token(tokens, TOKEN_APPEND, ">>");
+                token_add(list, TOKEN_APPEND, ">>");
                 i += 2;
             }
             else
             {
-                add_token(tokens, TOKEN_OUTPUT, ">");
+                token_add(list, TOKEN_OUTPUT, ">");
                 i++;
             }
-
             continue;
         }
 
-        /* Error output redirection */
-        if (line[i] == '2' && line[i + 1] == '>')
+        // Delimiter: BACKGROUND execution
+        if (input[i] == '&')
         {
-            add_token(tokens, TOKEN_ERROR_OUTPUT, "2>");
-            i += 2;
-            continue;
-        }
-
-        /* Background */
-        if (line[i] == '&')
-        {
-            add_token(tokens, TOKEN_BACKGROUND, "&");
+            token_add(list, TOKEN_BACKGROUND, "&");
             i++;
             continue;
         }
 
-        /* Word */
-        char buffer[1024];
+        // Start building a WORD token
+        char word[MAX_TOKEN_LEN];
         int j = 0;
+        int err = 0;
 
-        while (line[i] != '\0' &&
-               !isspace((unsigned char)line[i]) &&
-               line[i] != '|' &&
-               line[i] != '<' &&
-               line[i] != '>' &&
-               line[i] != '&')
+        // Loop to build the word until end of input or a delimiter is found
+        while (input[i] != '\0' && !isspace((unsigned char)input[i]) &&
+               input[i] != '|' && input[i] != '<' && input[i] != '>' && input[i] != '&')
         {
-            if (j < (int)sizeof(buffer) - 1)
-                buffer[j++] = line[i];
+            char c = input[i];
 
-            i++;
+            if (c == '\'')
+            {
+                // Single Quote
+                i++; // skip opening single quote
+                while (input[i] != '\0' && input[i] != '\'')
+                {
+                    if (j < MAX_TOKEN_LEN - 1)
+                    {
+                        word[j++] = input[i];
+                    }
+                    i++;
+                }
+
+                if (input[i] == '\'')
+                {
+                    i++; // skip closing single quote
+                }
+                else
+                {
+                    fprintf(stderr, "Lexer Error : Unterminated single quote\n");
+                    err = 1;
+                    break;
+                }
+            }
+            else if (c == '"')
+            {
+                // Double Quote
+                i++; // skip opening double quote
+                while (input[i] != '\0' && input[i] != '"')
+                {
+                    if (input[i] == '\\' && input[i + 1] != '\0')
+                    {
+                        // Escape character inside double quotes
+                        i++; // skip backslash
+                        if (j < MAX_TOKEN_LEN - 1)
+                        {
+                            word[j++] = input[i];
+                        }
+                        i++;
+                    }
+                    else
+                    {
+                        if (j < MAX_TOKEN_LEN - 1)
+                        {
+                            word[j++] = input[i];
+                        }
+                        i++;
+                    }
+                }
+
+                if (input[i] == '"')
+                {
+                    i++; // skip closing double quote
+                }
+                else
+                {
+                    fprintf(stderr, "Lexer Error : Unterminated double quote\n");
+                    err = 1;
+                    break;
+                }
+            }
+            else if (c == '\\')
+            {
+                // Escape character
+                i++; // skip backslash
+                if (input[i] != '\0')
+                {
+                    if (j < MAX_TOKEN_LEN - 1)
+                    {
+                        word[j++] = input[i];
+                    }
+                    i++;
+                }
+                else
+                {
+                    // Backslash at the very end of input
+                    break;
+                }
+            }
+            else
+            {
+                // Normal character
+                if (j < MAX_TOKEN_LEN - 1)
+                {
+                    word[j++] = c;
+                }
+                i++;
+            }
         }
 
-        buffer[j] = '\0';
+        if (err)
+        {
+            // Abort token list if lexing error occurs
+            list->count = 0;
+            return;
+        }
 
-        if (j > 0)
-            add_token(tokens, TOKEN_WORD, buffer);
+        word[j] = '\0';
+        token_add(list, TOKEN_WORD, word);
     }
 
-    /* End of input */
-    tokens->tokens[tokens->count] = create_token(TOKEN_EOF, NULL);
-    tokens->count++;
-}
-
-void free_tokens(token_list_t *tokens)
-{
-    if (tokens == NULL)
-        return;
-
-    for (int i = 0; i < tokens->count; i++)
-    {
-        free_token(tokens->tokens[i]);
-        tokens->tokens[i] = NULL;
-    }
-    tokens->count = 0;
+    // Add TOKEN_END at the end of the list
+    token_add(list, TOKEN_END, "END");
 }

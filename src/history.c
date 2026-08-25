@@ -1,16 +1,15 @@
 #include <stdio.h>
 #include <readline/history.h>
-#include "../include/history.h"
+#include "history.h"
 
 void print_history(void)
 {
-    HIST_ENTRY **entries = history_list();
-
-    if (entries != NULL)
+    HIST_ENTRY **list = history_list();
+    if (list != NULL)
     {
-        for (int i = 0; entries[i] != NULL; i++)
+        for (int i = 0; list[i] != NULL; i++)
         {
-            printf("%d  %s\n", i + 1, entries[i]->line);
+            printf("%d  %s\n", i + history_base, list[i]->line);
         }
     }
 }

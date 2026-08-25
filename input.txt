@@ -1,0 +1,20 @@
+echo hello
+pwd
+ls -d src
+mkdir testdir
+cd testdir
+pwd
+echo hello > test.txt
+cat test.txt
+echo world >> test.txt
+cat test.txt
+cd ..
+rmdir testdir
+pwd
+nonexistentcommand
+cd /does/not/exist
+cd a b
+cd ~
+pwd
+history
+exit

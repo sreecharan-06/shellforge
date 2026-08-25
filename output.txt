@@ -1,0 +1,55 @@
+=====================================
+      Shellforge 
+ A Unix Style Shell written in C
+=====================================
+shellforge$ echo hello
+hello
+shellforge$ pwd
+/mnt/c/Users/saich/.gemini/antigravity/scratch/shellforge
+shellforge$ ls -d src
+src
+shellforge$ mkdir testdir
+shellforge$ cd testdir
+shellforge$ pwd
+/mnt/c/Users/saich/.gemini/antigravity/scratch/shellforge/testdir
+shellforge$ echo hello > test.txt
+shellforge$ cat test.txt
+hello
+shellforge$ echo world >> test.txt
+shellforge$ cat test.txt
+hello
+world
+shellforge$ cd ..
+shellforge$ rmdir testdir
+rmdir: failed to remove 'testdir': Directory not empty
+shellforge$ pwd
+/mnt/c/Users/saich/.gemini/antigravity/scratch/shellforge
+shellforge$ nonexistentcommand
+nonexistentcommand: No such file or directory
+shellforge$ cd /does/not/exist
+cd: No such file or directory
+shellforge$ cd a b
+cd: too many arguments
+shellforge$ cd ~
+shellforge$ pwd
+/home/charan
+shellforge$ history
+1  echo hello
+2  pwd
+3  ls -d src
+4  mkdir testdir
+5  cd testdir
+6  pwd
+7  echo hello > test.txt
+8  cat test.txt
+9  echo world >> test.txt
+10  cat test.txt
+11  cd ..
+12  rmdir testdir
+13  pwd
+14  nonexistentcommand
+15  cd /does/not/exist
+16  cd a b
+17  cd ~
+18  pwd
+shellforge$ exit

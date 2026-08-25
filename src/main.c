@@ -1,4 +1,3 @@
-#define _DEFAULT_SOURCE
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h>
@@ -14,6 +13,9 @@
 
 int main(void)
 {
+    setvbuf(stdout, NULL, _IOLBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+
     // Display a welcome banner when the shell starts
     printf("=====================================\n");
     printf("      Shellforge \n");
@@ -22,7 +24,6 @@ int main(void)
 
     token_list_t tokens;
     pipeline_t pipeline;
- 
     char *line;
 
     while (1)
@@ -42,39 +43,38 @@ int main(void)
         if (strcmp(line, "history") == 0)
         {
             print_history();
+            add_history(line);
             free(line);
             continue;
         }
 
-        // milestone 1 - enabling history
         add_history(line);
 
-        // milestone 2.1 - tokenization and lexer
         lexer(line, &tokens);
+        // token_print(&tokens);
 
-        // milestone 2.2 - expansion of environment variables and parser
         if (parser(&tokens, &pipeline))
         {
             expand_variables(&pipeline);
-        }
-
-        for (int i = 0; i < pipeline.command_count; i++)
-        {
-            int result = execute_command(&pipeline.commands[i]);
-
-            if (result == 1)
+            // pipeline_print(&pipeline);
+            
+            for (int i = 0; i < pipeline.command_count; i++)
             {
-                pipeline_free(&pipeline);
-                free_tokens(&tokens);
-                free(line);
-                return 0;
+                int result = execute_command(&pipeline.commands[i]);
+
+                // Only exit the shell if the 'exit' built-in was explicitly called and returned 1 (success)
+                if (is_builtin(&pipeline.commands[i]) && strcmp(pipeline.commands[i].argv[0], "exit") == 0)
+                {
+                    if (result == 1)
+                    {
+                        free(line);
+                        return 0;
+                    }
+                }
             }
         }
 
-        pipeline_free(&pipeline);
-        free_tokens(&tokens);
         free(line);
     }
-    
     return 0;
 }
