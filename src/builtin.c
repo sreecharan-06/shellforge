@@ -98,6 +98,7 @@ static int builtin_pwd(command_t *cmd)
     /*
      * Display current directory.
      */
+    printf("2500031263\n");
     printf("%s\n", current_directory);
 
     return 0;
@@ -127,6 +128,8 @@ static int builtin_echo(command_t *cmd)
             printf(" ");
         }
     }
+    printf("\n");
+    printf("2500031263\n");
     printf("\n");
 
     return 0;
